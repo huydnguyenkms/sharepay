@@ -1,0 +1,79 @@
+# Production stack WITH HTTPS.
+#
+# A Caddy reverse proxy terminates TLS (auto-provisioning + renewing Let's Encrypt certs)
+# and forwards to the frontend. Only Caddy is published (ports 80 + 443); the frontend,
+# backend and Postgres stay on the internal Docker network.
+#
+# Requires in .env:  DB_PASSWORD, JWT_SECRET, DOMAIN, ACME_EMAIL
+# (DOMAIN's A record must already point to this server.)
+#
+# Switch from the HTTP stack to this one (data is preserved — do NOT pass -v):
+#   docker compose -f docker-compose.prod.yml down
+#   docker compose -f docker-compose.https.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sharepay-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sharepay}
+      POSTGRES_USER: ${DB_USER:-sharepay}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - sharepay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sharepay} -d ${DB_NAME:-sharepay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sharepay-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-sharepay}
+      DB_USER: ${DB_USER:-sharepay}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-1440}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sharepay-frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: sharepay-caddy
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  sharepay-pgdata:
+  caddy-data:
+  caddy-config:
