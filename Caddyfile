@@ -1,0 +1,12 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# DOMAIN and ACME_EMAIL are injected from the .env file via docker-compose.https.yml.
+# DOMAIN may list several names separated by spaces, e.g. "example.com www.example.com".
+
+{
+    email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+    encode gzip
+    reverse_proxy frontend:80
+}
