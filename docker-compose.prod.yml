@@ -4,7 +4,8 @@
 #   - Only the frontend (nginx) publishes a port (80). The backend and Postgres are reachable
 #     only on the internal Docker network — never from the public internet.
 #   - nginx proxies /api -> backend:8080 (see frontend/nginx.conf), so the browser is always
-#     same-origin: no CORS config needed.
+#     same-origin. The backend still sees a cross-origin request (it's behind the proxy), so
+#     set CORS_ALLOWED_ORIGINS to your public origin (e.g. https://sharepay.pro).
 #   - All secrets come from a .env file (copy .env.prod.example -> .env). Compose fails fast
 #     if a required secret is missing.
 #
@@ -44,6 +45,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-1440}
+      # Even though nginx proxies /api -> backend (browser is same-origin), the backend sits
+      # behind the proxy and sees the request as cross-origin, so it still applies CORS. List
+      # the public origin(s) here, space- or comma-separated, e.g. "https://sharepay.pro".
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?set CORS_ALLOWED_ORIGINS in .env}
     restart: unless-stopped
 
   frontend:

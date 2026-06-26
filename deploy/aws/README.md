@@ -11,7 +11,9 @@ This runs the whole stack on one EC2 instance using `docker-compose.prod.yml`:
 ```
 
 Only port **80** is exposed. The backend and Postgres are reachable only inside the Docker
-network. nginx proxies `/api` to the backend, so the browser is always same-origin (no CORS).
+network. nginx proxies `/api` to the backend, so the browser is always same-origin. The backend
+still sees the request as cross-origin (it's behind the proxy), so set `CORS_ALLOWED_ORIGINS`
+in `.env` to your public origin — otherwise register/login return `403`.
 
 > Cost note: `t3.small` is not free-tier. For free-tier use `t2.micro`/`t3.micro` (the setup
 > script adds 2 GB swap so the builds still succeed, just slower). Stop the instance when idle.
@@ -120,7 +122,8 @@ SSH back in and start the stack:
 ssh -i "$KEY_NAME.pem" ec2-user@"$PUBLIC_DNS"
 cd ~/sharepay
 cp .env.prod.example .env
-nano .env                         # set DB_PASSWORD and a strong JWT_SECRET (openssl rand -base64 48)
+nano .env                         # set DB_PASSWORD, a strong JWT_SECRET (openssl rand -base64 48),
+                                  # and CORS_ALLOWED_ORIGINS (your public origin, e.g. https://sharepay.pro)
 bash deploy/aws/deploy.sh         # builds images and starts everything
 ```
 
@@ -139,15 +142,18 @@ real deployment.
 ## Day-2 operations
 
 ```bash
+# deploy.sh auto-picks docker-compose.https.yml when DOMAIN is set in .env, else the HTTP stack.
+# Substitute that file below (or override with: bash deploy/aws/deploy.sh docker-compose.prod.yml).
+
 # Logs
-docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.https.yml logs -f backend
 
 # Update after pulling new code
 git pull && bash deploy/aws/deploy.sh
 
 # Stop / start
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.https.yml down
+docker compose -f docker-compose.https.yml up -d
 
 # Stop the EC2 instance to save money (data persists on the volume)
 aws ec2 stop-instances --region "$AWS_REGION" --instance-ids "$INSTANCE_ID"
