@@ -1,0 +1,28 @@
+# Netlify configuration for the SharePay frontend.
+#
+# IMPORTANT: Netlify hosts only the static frontend. The Spring Boot backend and
+# PostgreSQL must be deployed elsewhere (Render / Railway / Fly.io / Koyeb, using the
+# Dockerfile in this repo). Then set the backend's public URL in the /api/* redirect below.
+
+[build]
+  command = "cd frontend && npm install && npm run build"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API calls to the deployed backend. Because Netlify proxies this server-side, the
+# browser only ever talks to your Netlify domain, so there are no CORS issues and the
+# frontend's existing `/api` base URL keeps working unchanged.
+# >>> Replace YOUR-BACKEND-HOST with your backend's public host (no trailing slash) <<<
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR-BACKEND-HOST/api/:splat"
+  status = 200
+  force = true
+
+# SPA history fallback: any non-asset path serves index.html so client-side routing works.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

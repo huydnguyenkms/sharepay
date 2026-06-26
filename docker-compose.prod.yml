@@ -1,0 +1,61 @@
+# Production stack for a single host (e.g. one EC2 instance).
+#
+# Security posture vs. the dev docker-compose.yml:
+#   - Only the frontend (nginx) publishes a port (80). The backend and Postgres are reachable
+#     only on the internal Docker network — never from the public internet.
+#   - nginx proxies /api -> backend:8080 (see frontend/nginx.conf), so the browser is always
+#     same-origin: no CORS config needed.
+#   - All secrets come from a .env file (copy .env.prod.example -> .env). Compose fails fast
+#     if a required secret is missing.
+#
+# Run:  docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sharepay-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sharepay}
+      POSTGRES_USER: ${DB_USER:-sharepay}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - sharepay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sharepay} -d ${DB_NAME:-sharepay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sharepay-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-sharepay}
+      DB_USER: ${DB_USER:-sharepay}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-1440}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sharepay-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  sharepay-pgdata:
