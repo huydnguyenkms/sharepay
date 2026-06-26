@@ -27,7 +27,7 @@ import com.sharepay.service.WorkspaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -38,12 +38,15 @@ import java.util.Map;
 
 /**
  * Seeds a realistic demo workspace/event (the spec's "Huy & Friends" / "Da Nang Trip 2026")
- * by driving the real service layer so the seeded ledger is guaranteed consistent. Runs on
- * the dev (H2) and docker (Postgres) profiles, but only when the database is empty
- * (no users) — so it never reseeds or touches a populated/production database.
+ * by driving the real service layer so the seeded ledger is guaranteed consistent.
+ *
+ * <p>Only runs when {@code app.demo-seed-enabled=true} AND the database is empty (no users).
+ * The dev profile turns it on; production (docker) leaves it off, so a deployed instance never
+ * creates the well-known demo account. It can still be enabled on demand via the
+ * {@code DEMO_SEED_ENABLED=true} environment variable.
  */
 @Component
-@Profile({"dev", "docker"})
+@ConditionalOnProperty(name = "app.demo-seed-enabled", havingValue = "true")
 public class DemoDataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoDataInitializer.class);

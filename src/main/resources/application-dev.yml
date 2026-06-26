@@ -15,6 +15,10 @@ spring:
       enabled: true
       path: /h2-console
 
+app:
+  # Local dev seeds the demo workspace/event for convenience.
+  demo-seed-enabled: true
+
 logging:
   level:
     com.sharepay: DEBUG
