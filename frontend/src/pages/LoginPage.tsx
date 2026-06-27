@@ -93,10 +93,6 @@ export default function LoginPage() {
               Sign up
             </Link>
           </Typography>
-
-          <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 2 }}>
-            Demo: huy@sharepay.dev / password123
-          </Typography>
         </CardContent>
       </Card>
     </Box>
